@@ -52,12 +52,12 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     return outputs
 
 
-def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
+def batchify_rays(rays_flat, chunk=1024*32, step=0, **kwargs):
     """Render rays in smaller minibatches to avoid OOM.
     """
     all_ret = {}
     for i in range(0, rays_flat.shape[0], chunk):
-        ret = render_rays(rays_flat[i:i+chunk], **kwargs)
+        ret = render_rays(rays_flat[i:i+chunk], step=step, **kwargs)
         for k in ret:
             if k not in all_ret:
                 all_ret[k] = []
@@ -68,7 +68,7 @@ def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
 
 
 def render(H, W, focal, chunk=1024*32, rays=None, c2w=None, ndc=True,
-                  near=0., far=1.,
+                  near=0., far=1., step=0,
                   use_viewdirs=False, c2w_staticcam=None,
                   **kwargs):
     """Render rays
@@ -124,7 +124,7 @@ def render(H, W, focal, chunk=1024*32, rays=None, c2w=None, ndc=True,
         rays = torch.cat([rays, viewdirs], -1)
 
     # Render and reshape
-    all_ret = batchify_rays(rays, chunk, **kwargs)
+    all_ret = batchify_rays(rays, chunk, step=step, **kwargs)
     for k in all_ret:
         k_sh = list(sh[:-1]) + list(all_ret[k].shape[1:])
         all_ret[k] = torch.reshape(all_ret[k], k_sh)
@@ -140,7 +140,7 @@ def extract_mesh(render_kwargs, mesh_grid_size=80, threshold=50):
     device = next(network.parameters()).device
 
     with torch.no_grad():
-        points = np.linspace(-1, 1, mesh_grid_size)
+        points = np.linspace(-0.3, 0.3, mesh_grid_size)
         query_pts = torch.tensor(np.stack(np.meshgrid(points, points, points), -1).astype(np.float32)).reshape(-1, 1, 3).to(device)
         viewdirs = torch.zeros(query_pts.shape[0], 3).to(device)
 
@@ -172,7 +172,7 @@ def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=N
     for i, c2w in enumerate(tqdm(render_poses)):
         print(i, time.time() - t)
         t = time.time()
-        rgb, disp, acc, _ = render(H, W, focal, chunk=chunk, c2w=c2w[:3,:4], **render_kwargs)
+        rgb, disp, acc, _ = render(H, W, focal, chunk=chunk, step=i, c2w=c2w[:3,:4], **render_kwargs)
         rgbs.append(rgb.cpu().numpy())
         disps.append(disp.cpu().numpy())
         if i==0:
@@ -330,6 +330,7 @@ def render_rays(ray_batch,
                 network_fn,
                 network_query_fn,
                 N_samples,
+                step=0,
                 retraw=False,
                 lindisp=False,
                 perturb=0.,
@@ -416,7 +417,8 @@ def render_rays(ray_batch,
 
         z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
         pts = rays_o[...,None,:] + rays_d[...,None,:] * z_vals[...,:,None] # [N_rays, N_samples + N_importance, 3]
-
+       # pts[:,:,1] += 0.013*torch.sin(pts[:,:,2]*145+0.3*step)
+        #print(f'pts shape: {pts.shape}')
         run_fn = network_fn if network_fine is None else network_fine
 #         raw = run_network(pts, fn=run_fn)
         raw = network_query_fn(pts, viewdirs, run_fn)

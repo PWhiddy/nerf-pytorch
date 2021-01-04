@@ -1,0 +1,20 @@
+expname = polka_test_1024
+basedir = ./logs
+datadir = ./data/nerf_llff_data/polka_plant_scene_1024
+dataset_type = llff
+
+factor = 1
+llffhold = 8
+
+netwidth_fine = 384
+netwidth = 384
+
+i_testset = 10000
+
+N_rand = 1024
+N_samples = 96
+N_importance = 96
+
+use_viewdirs = True
+raw_noise_std = 1e0
+

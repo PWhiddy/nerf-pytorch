@@ -162,6 +162,19 @@ def render_path_spiral(c2w, up, rads, focal, zdelta, zrate, rots, N):
     return render_poses
     
 
+def render_path_grid(c2w, xsize, xcount, ysize, ycount, up, focal):
+    render_poses = []
+    hwf = c2w[:,4:5]
+    
+    xspan = xsize*xcount
+    yspan = ysize*ycount
+    
+    for yp in np.linspace(0.5*yspan, -0.5*yspan, ycount):
+        for xp in np.linspace(-0.5*xspan, 0.5*xspan, xcount):
+            c = np.dot(c2w[:3,:4], np.array([xp, yp, 0.0, 1.0]))
+            z = normalize(c - np.dot(c2w[:3,:4], np.array([0,0,-focal, 1.])))
+            render_poses.append(np.concatenate([viewmatrix(z,up,c), hwf], 1))
+    return render_poses
 
 def recenter_poses(poses):
 
@@ -286,8 +299,8 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         tt = poses[:,:3,3] # ptstocam(poses[:3,3,:].T, c2w).T
         rads = np.percentile(np.abs(tt), 90, 0)
         c2w_path = c2w
-        N_views = 120
-        N_rots = 2
+        N_views = 360#120
+        N_rots = 1#2
         if path_zflat:
 #             zloc = np.percentile(tt, 10, 0)[2]
             zloc = -close_depth * .1
@@ -297,8 +310,9 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
             N_views/=2
 
         # Generate poses for spiral path
-        render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
-        
+        #render_poses = render_path_spiral(c2w_path, up, rads, focal, zdelta, zrate=.5, rots=N_rots, N=N_views)
+        # Generate poses for grid
+        render_poses = render_path_grid(c2w_path, 0.03, 17, 0.03, 17, up, focal)
         
     render_poses = np.array(render_poses).astype(np.float32)
 
