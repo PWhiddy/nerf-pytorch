@@ -554,7 +554,7 @@ def config_parser():
                         help='frequency of weight ckpt saving')
     parser.add_argument("--i_testset", type=int, default=50000, 
                         help='frequency of testset saving')
-    parser.add_argument("--i_video",   type=int, default=50000, 
+    parser.add_argument("--i_video",   type=int, default=200000, 
                         help='frequency of render_poses video saving')
 
     return parser
@@ -823,9 +823,11 @@ def train():
             print('Saved checkpoints at', path)
 
         if i%args.i_video==0 and i > 0:
+            render_dir = os.path.join(basedir, expname, f'vid_frames_{i}')
+            os.makedirs(render_dir, exist_ok=True)
             # Turn on testing mode
             with torch.no_grad():
-                rgbs, disps = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
+                rgbs, disps = render_path(render_poses, hwf, args.chunk, render_kwargs_test, savedir=render_dir)
             print('Done, saving', rgbs.shape, disps.shape)
             moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
